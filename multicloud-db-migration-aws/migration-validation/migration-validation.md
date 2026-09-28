@@ -189,6 +189,6 @@ Do not upload passwords, private SSH keys, wallet contents, or unsanitized envir
 
 ## Acknowledgements
 
-* **Author** - Arnav Saha, Principal Solutions Architect, OCI Multicloud
+* **Author** - Arnab Saha, Principal Solutions Architect, OCI Multicloud
 * **Author** - Vineet Agarwal, Senior Principal Solutions Architect, OCI Multicloud
-* **Last Updated By/Date** - Arnav Saha and Vineet Agarwal / September 28, 2026
+* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / September 28, 2026
