@@ -2,17 +2,19 @@
 
 ## Introduction
 
-Use the fleet-generated response file; do not rebuild it from the earlier offline example. Evaluation checks readiness but does not perform the full export/import or prove end-to-end replication.
+Review the ZDM response file and GoldenGate preparation in your environment, then run the ZDM evaluation process. ZDM coordinates the initial Data Pump transfer and GoldenGate replication. Evaluation checks readiness but does not perform the full export/import or prove end-to-end replication.
+
+The ZDM response file contains your migration settings: the source and target connections, the table to migrate, the shared storage, and the GoldenGate configuration. ZDM reads this file during evaluation and migration so it uses the correct resources and migration method.
 
 Estimated Time: 20 minutes
 
 ### Objectives
 
-Verify the migration scope, distinguish SQL and ZDM authentication, and complete evaluation.
+Review the ZDM and GoldenGate configuration, confirm target readiness, and complete the ZDM evaluation process.
 
-## Task 1: Review the Working Configuration
+## Task 1: Review the ZDM and GoldenGate Configuration
 
-1. Run as `oracle` at the EC2 shell and load the workshop environment.
+1. Run as `oracle` at the EC2 shell and load your environment.
 
     ```bash
     <copy>
@@ -24,7 +26,7 @@ Verify the migration scope, distinguish SQL and ZDM authentication, and complete
     </copy>
     ```
 
-2. Display the migration method, included object, deployment names, and target service.
+2. Display the ZDM migration method, included object, GoldenGate deployment names, and target service.
 
     ```bash
     <copy>
@@ -59,7 +61,7 @@ Verify the migration scope, distinguish SQL and ZDM authentication, and complete
 
     ![Response validator finishes with ZDM_RESPONSE_VALID for Lab 101](./images/response-validation-complete.png)
 
-## Task 2: Confirm Target Preparation
+## Task 2: Confirm the ZDM and GoldenGate Target Preparation
 
 The target accounts are already prepared. The target TLS wallet is already installed for ZDM. ZDM prompts for credentials at runtime; SQL*Plus uses the password-authenticated alias from `adbs.env`.
 
@@ -80,7 +82,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-3. Enter the instructor-provided password at the prompt. At **target `SQL>`**, check the database and GoldenGate replication setting.
+3. Enter **Target ADMIN Password** from your reservation information when prompted. Check the target database state and GoldenGate replication setting.
 
     ```sql
     <copy>
@@ -91,6 +93,10 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
+    Confirm the target is `READ WRITE` and `enable_goldengate_replication` is `TRUE`. The screenshot shows the replication setting.
+
+    ![Target GoldenGate replication parameter is TRUE](./images/target-replication-enabled.png)
+
 4. Check the target accounts.
 
     ```sql
@@ -99,6 +105,10 @@ The target accounts are already prepared. The target TLS wallet is already insta
     WHERE username IN ('GGADMIN','FINANCE') ORDER BY username;
     </copy>
     ```
+
+    Confirm both `GGADMIN` and `FINANCE` are `OPEN`. GoldenGate uses `GGADMIN` for the target replication connection; `FINANCE` owns the migrated table.
+
+    ![Target FINANCE and GGADMIN accounts are OPEN](./images/target-accounts-open.png)
 
 5. Check that the target ACCOUNTS table is absent before the first migration. If it already exists, stop; do not drop it to force a rerun.
 
@@ -109,6 +119,8 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
+    Expect `no rows selected` for a fresh target. If a row is returned, stop before evaluation and confirm the target assignment and migration history. Do not drop the table.
+
 6. Return to the EC2 shell.
 
     ```sql
@@ -117,11 +129,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-    For a fresh migration, the last query must return `no rows selected`. Stop and ask the instructor if it does not. Account status alone does not prove every required privilege.
-
-    ![Target GoldenGate replication enabled and FINANCE and GGADMIN accounts OPEN](./images/target-accounts-ready.png)
-
-## Task 3: Run Evaluation
+## Task 3: Run the ZDM Evaluation Process
 
 1. Back at the **`oracle` shell**, reload the source environment after the target SQL check.
 
@@ -135,7 +143,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-2. Submit the evaluation from the **`oracle` shell**.
+2. Submit the ZDM evaluation from the **`oracle` shell** to check the source, target, Data Pump settings, and GoldenGate hub readiness.
 
     ```bash
     <copy>
@@ -153,23 +161,23 @@ The target accounts are already prepared. The target TLS wallet is already insta
 
     ![Evaluation command ends with the eval option](./images/evaluation-command.png)
 
-3. Enter the prompted passwords for source SYSTEM, source GGADMIN, target ADMIN, target GGADMIN, and hub oggadmin. Do not put them on command lines, in screenshots, or in the response file. Enter the lab passwords provided by your instructor. Password input is not displayed.
+3. Enter the prompted passwords for source SYSTEM, source GGADMIN, target ADMIN, target GGADMIN, and GoldenGate hub oggadmin from the corresponding fields in your reservation information. Do not put them on command lines, in screenshots, or in the response file. Password input is not displayed.
 
     ![Evaluation submitted with runtime password prompts and returned job ID](./images/evaluation-submitted.png)
 
-    Submission schedules the evaluation; it does not mean it passed. Use the job ID returned in your own session, which may differ from the example's `1`.
+    ZDM prints the job ID when it schedules your evaluation. Record this ID: it identifies your evaluation and is important for monitoring its progress and locating its results. Your ID may differ from the screenshot.
 
-4. Query the job ID returned by the evaluation. The example below uses job **1**; replace `1` with your returned evaluation ID if different. Repeat the query until it finishes; do not resubmit the evaluation.
+4. Replace `<JOB_ID>` (including the brackets) with the job ID printed in the previous step, then run the command to check the evaluation status. Run it again to see updated progress.
 
     ```bash
     <copy>
-    "$ZDMCLI" query job -jobid 1
+    "$ZDMCLI" query job -jobid <JOB_ID>
     </copy>
     ```
 
-5. Proceed only when this job reports `SUCCEEDED`. Review CPAT findings and the excluded-objects file: ACCOUNTS must not be excluded from the required migration/replication scope. Save the actual result-log path from the output.
+    ![ZDM evaluation query reports the job ID and Current status SUCCEEDED](./images/evaluation-succeeded.png)
 
-    ![Evaluation job reports Current status SUCCEEDED](./images/evaluation-succeeded.png)
+5. Proceed only when your selected evaluation job reports `SUCCEEDED`. Review CPAT findings and the excluded-objects file: ACCOUNTS must not be excluded from the required migration/replication scope. Save the actual result-log path from your output.
 
     Completed prerequisite phases from the same evaluation:
 
@@ -183,4 +191,4 @@ The target accounts are already prepared. The target TLS wallet is already insta
 
 * **Author** - Arnab Saha, Principal Solutions Architect, OCI Multicloud
 * **Author** - Vineet Agarwal, Senior Principal Solutions Architect, OCI Multicloud
-* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / September 30, 2026
+* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 7, 2026
