@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Start the evaluated ZDM online migration, pause while GoldenGate replication is running, verify source data changes on the target, and complete a controlled cutover. Use your own job IDs and log paths. Migration duration and row counts depend on your environment.
+Start the evaluated ZDM online migration, pause while GoldenGate replication is running, verify source database changes on the target database, and complete a controlled cutover. Use your own job IDs and log paths. Migration duration and row counts depend on your environment.
 
 Estimated Time: 40 minutes
 
@@ -12,7 +12,7 @@ Run Data Pump and GoldenGate through ZDM, verify committed changes, and retain c
 
 ## Task 1: Start the ZDM Migration with a GoldenGate Replication Pause
 
-1. At the EC2 shell as `oracle`, load the environment after successful evaluation and NFS validation.
+1. Continue in the `oracle` shell after successful ZDM evaluation and Amazon EFS validation. Load your environment variables. If you reconnected through Session Manager as `ssm-user`, run `sudo -iu oracle` first.
 
     ```bash
     <copy>
@@ -42,7 +42,7 @@ Run Data Pump and GoldenGate through ZDM, verify committed changes, and retain c
 
     ![Migration command requests pause after ZDM_MONITOR_GG_LAG](./images/migration-command.png)
 
-3. Enter the source SYSTEM, source GGADMIN, target ADMIN, target GGADMIN, and GoldenGate hub oggadmin passwords from your reservation information. Record the migration job ID printed by ZDM; use this ID throughout the remaining steps.
+3. Enter the prompted passwords for the source database (`SYSTEM`, `GGADMIN`), target database (`ADMIN`, `GGADMIN`), and GoldenGate hub (`oggadmin`) from your reservation information. Password input is not displayed. Record the migration job ID printed by ZDM; use this ID throughout the remaining steps.
 
     ![Migration password prompts followed by scheduled job ID 2](./images/migration-submitted.png)
 
@@ -58,7 +58,7 @@ Run Data Pump and GoldenGate through ZDM, verify committed changes, and retain c
 
 ZDM first coordinates the initial Data Pump load, then monitors GoldenGate replication. The `-pauseafter ZDM_MONITOR_GG_LAG` option tells ZDM where to pause. Monitor your migration job until its status is `PAUSED` at that checkpoint.
 
-1. Repeat this query periodically from the **`oracle` EC2 shell**, not the migration submission.
+1. Run this query in the `oracle` shell to check progress. Repeat the query, not the migration submission.
 
     ```bash
     <copy>
@@ -68,9 +68,9 @@ ZDM first coordinates the initial Data Pump load, then monitors GoldenGate repli
 
 2. Confirm that the job reaches these milestones in order:
 
-    - Source, target, GoldenGate hub, and Data Pump validation.
-    - GoldenGate source preparation and Extract creation.
-    - Data Pump export to EFS, shared-storage transfer phase, and target import.
+    - Source database, target database, GoldenGate hub, and Data Pump validation.
+    - GoldenGate source database preparation and Extract creation.
+    - Data Pump export from the source database to Amazon EFS, the Amazon EFS transfer phase, and import into the target database.
     - Replicat creation/start and lag monitoring.
     - Job `PAUSED` after `ZDM_MONITOR_GG_LAG` completes.
 
@@ -82,9 +82,9 @@ ZDM first coordinates the initial Data Pump load, then monitors GoldenGate repli
 
 ## Task 3: Verify GoldenGate INSERT, UPDATE, and DELETE Replication
 
-Run only while the migration is paused after lag monitoring, before cutover. Use the three test rows below. Never run this DML on the target.
+Run only while the migration is paused after lag monitoring, before cutover. Use the three test rows below. Run the INSERT, UPDATE, and DELETE statements only on the source database, never on the target database.
 
-1. Load the source environment in the **oracle EC2 shell**.
+1. Load the source database environment variables in the `oracle` shell.
 
     ```bash
     <copy>
@@ -92,7 +92,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-2. Open the source database.
+2. Connect to the source database using SQL*Plus as `SYSDBA` from the `oracle` shell.
 
     ```bash
     <copy>
@@ -100,7 +100,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-3. At **source SQL>**, inspect the table structure.
+3. At the source database `SQL>` prompt, inspect the table structure.
 
     ```sql
     <copy>
@@ -182,7 +182,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
 
     ![SQL Plus reports Commit complete](./images/source-commit-result.png)
 
-9. Record the committed source results.
+9. Record the committed source database results.
 
     ```sql
     <copy>
@@ -197,7 +197,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
 
     ![Committed source results contain the updated row and retained row, without the deleted row](./images/source-dml-results.png)
 
-10. Return to the **oracle shell**.
+10. Exit SQL*Plus to return to the `oracle` shell.
 
     ```sql
     <copy>
@@ -205,7 +205,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-11. Load the target environment.
+11. Load the target database environment variables in the `oracle` shell.
 
     ```bash
     <copy>
@@ -213,7 +213,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-12. Connect to the target as ADMIN and enter the password at the prompt.
+12. Connect to the target database as `ADMIN`. Enter **Target ADMIN Password** from your reservation information when prompted.
 
     ```bash
     <copy>
@@ -221,7 +221,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-13. At **target SQL>**, query the same rows.
+13. At the target database `SQL>` prompt, query the same rows.
 
     ```sql
     <copy>
@@ -233,11 +233,11 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-    Repeat this SELECT until it matches the committed source results. Replication is asynchronous. Do not write to the target or rerun the source inserts. Stop if the results do not converge.
+    Repeat this SELECT until it matches the committed source database results. Replication is asynchronous. Do not write to the target database or rerun the source database inserts. Resolve any mismatch before cutover.
 
     ![Target query matches the committed source INSERT UPDATE and DELETE results](./images/target-dml-results.png)
 
-14. Return to the **oracle shell**.
+14. Exit SQL*Plus to return to the `oracle` shell.
 
     ```sql
     <copy>
@@ -249,7 +249,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
 
 1. Stop all source application writes and finish or roll back outstanding transactions **before** resuming. In this lab, stop the DML test and any workload generator. Do not stop the database, listener, or GoldenGate manually.
 
-2. Load ZDM in the **oracle shell**.
+2. Load the ZDM environment variables in the `oracle` shell.
 
     ```bash
     <copy>
@@ -294,7 +294,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
 
 ## Task 5: Validate the Migration and Save the ZDM Results
 
-1. After the migration reports `SUCCEEDED`, load the target environment from the **`oracle` EC2 shell**.
+1. After the migration reports `SUCCEEDED`, load the target database environment variables in the `oracle` shell.
 
     ```bash
     <copy>
@@ -341,4 +341,4 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
 
 * **Author** - Arnab Saha, Principal Solutions Architect, OCI Multicloud
 * **Author** - Vineet Agarwal, Senior Principal Solutions Architect, OCI Multicloud
-* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 7, 2026
+* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 8, 2026

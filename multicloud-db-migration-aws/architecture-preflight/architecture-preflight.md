@@ -14,11 +14,11 @@ Connect to your assigned EC2 instance, run the automated checks as `oracle`, and
 
 ## Task 1: Connect Through Session Manager
 
-1. Sign in to the AWS Console and select **US West (Oregon), us-west-2**.
+1. Confirm that the AWS Console Region is **US West (Oregon), us-west-2**.
 
-2. Open **EC2 → Instances**, select your assigned instance, and choose **Connect → Session Manager → Connect**. Use Session Manager, not EC2 Instance Connect (SSH).
+2. Open **EC2 → Instances**, select your assigned instance, and choose **Connect → Session Manager → Connect**.
 
-3. The session opens a Linux shell, normally as `ssm-user`. Switch to the Oracle operating-system user:
+3. The session opens a Linux shell as `ssm-user`. Switch to the `oracle` operating-system user:
 
     ```bash
     <copy>
@@ -34,11 +34,11 @@ Connect to your assigned EC2 instance, run the automated checks as `oracle`, and
     </copy>
     ```
 
-    Expect `oracle`. Run the following commands in this EC2 shell, not in CloudShell.
+    The output should be `oracle`. Stay in this `oracle` shell for the remaining steps.
 
 ## Task 2: Run the Preflight Script
 
-1. Run the script from the Oracle home directory and save its output:
+1. Run the script from the `oracle` user's home directory and save its output. The script loads your assigned environment variables and performs the checks automatically. Wait until the shell prompt returns before entering another command.
 
     ```bash
     <copy>
@@ -49,11 +49,9 @@ Connect to your assigned EC2 instance, run the automated checks as `oracle`, and
     </copy>
     ```
 
-    The script loads the assigned environment and performs the checks automatically. Wait until the shell prompt returns. Do not enter SQL statements or rerun the individual checks while it is running.
+2. Check the summary. Expect `Failed checks : 0` and `LAB1_PREFLIGHT: PASS`. Resolve any failed checks before proceeding.
 
-2. Check the final summary. Expect `Failed checks : 0` and `LAB1_PREFLIGHT: PASS`. If a check fails, stop before starting migration and identify the failed section.
-
-3. Open the saved output to review it without running the script again:
+3. Open the saved output to review:
 
     ```bash
     <copy>
@@ -65,15 +63,15 @@ Connect to your assigned EC2 instance, run the automated checks as `oracle`, and
 
 ## Task 3: Validate Each Output Section
 
-Compare the results below with your own output. Resource names, addresses, paths, timestamps, container IDs, and row counts can differ. Check your assigned values rather than copying values from the screenshots.
+The sections below show screenshots of sample output. Compare them with your own results. Resource names, addresses, paths, timestamps, container IDs, and row counts can differ. Check your assigned values rather than copying values from the screenshots.
 
 ### Section 1: Your Assigned Environment
 
-This section identifies the source EC2 host, source database, target Autonomous Database, and EFS filesystem. It also checks that the ZDM executable is accessible.
+This section identifies the source database EC2 host, source database, target Autonomous Database, and Amazon EFS filesystem. It also checks that the ZDM executable is accessible.
 
-Confirm that the assignment ID, target database name, target TNS alias, and **ADB-S display name** match your assigned resources. The display name identifies the target in the console; the TNS alias is used to connect to it. Check that the source and EFS addresses are populated and that the ZDM executable check passes.
+Confirm that the assignment ID, target database name, target database TNS alias, and **ADB-S display name** match your assigned resources. The display name identifies the target database in the console; the TNS alias is used to connect to it. Check that the source database and Amazon EFS addresses are populated and that the ZDM executable check passes.
 
-These values connect the migration components to the correct source, target, and shared storage. A mismatch can send a connection or data-transfer operation to the wrong resource.
+These values connect the migration components to the correct source database, target database, and Amazon EFS storage. A mismatch can send a connection or data-transfer operation to the wrong resource.
 
 ![Assigned source, target ADB-S display name, EFS details, and ZDM executable check](./images/preflight-section-1.png)
 
@@ -99,21 +97,21 @@ This section checks the source database state, logging configuration, GoldenGate
 
 First, confirm that the instance is `OPEN` and `ACTIVE`, the database is `READ WRITE`, and `LOG_MODE` is `ARCHIVELOG`. Expect `FORCE_LOGGING` to be `YES`, supplemental logging to be enabled (`YES` or `IMPLICIT`), and `enable_goldengate_replication` to be `TRUE`.
 
-The source must stay available while the initial data is copied. Archive logging and the additional logging settings provide the change information GoldenGate needs to capture ongoing transactions.
+The source database must stay available while the initial data is copied. Archive logging and the additional logging settings provide the change information GoldenGate needs to capture ongoing transactions.
 
 ![Source database state, archive logging, supplemental logging, and GoldenGate replication setting](./images/preflight-section-4a.png)
 
-Next, confirm that `FINANCE`, `GGADMIN`, and `SYSTEM` are all `OPEN`. Record `SOURCE_BASELINE`, the current number of rows in `FINANCE.ACCOUNTS`, for later comparison with the target. Expect `PASS` for source SQL readiness checks.
+Next, confirm that the source database accounts `FINANCE`, `GGADMIN`, and `SYSTEM` are all `OPEN`. Record `SOURCE_BASELINE`, the current number of rows in `FINANCE.ACCOUNTS`, for later comparison with the target database. Expect `PASS` for source database SQL readiness checks.
 
 ![Source memory diagnostics, open database accounts, baseline row count, and SQL readiness result](./images/preflight-section-4b.png)
 
 ### Section 5: DNS and TCP Connectivity
 
-This section checks whether the target database and EFS hostnames resolve, then tests connections from EC2 to target ports `1521` and `1522` and EFS port `2049`.
+This section checks whether the target database and Amazon EFS hostnames resolve, then tests connections from EC2 to target database ports `1521` and `1522` and Amazon EFS port `2049`.
 
-Expect `PASS` for both hostname checks and all three port checks. Port `1521` is used for the configured SQL connection, `1522` for the wallet-based TCPS connection, and `2049` for NFS access to EFS.
+Expect `PASS` for both hostname checks and all three port checks. Port `1521` is used for the configured SQL connection, `1522` for the wallet-based TCPS connection, and `2049` for Amazon EFS access over NFSv4.
 
-ZDM and GoldenGate need network access to the databases, and Data Pump needs the shared staging storage. These checks prove that EC2 can reach the endpoints; they do not prove database authentication, an EFS mount, or connectivity from the target database to EFS.
+ZDM and GoldenGate need network access to the databases, and Data Pump needs Amazon EFS staging storage. These checks prove that EC2 can reach the endpoints; they do not prove database authentication, an Amazon EFS mount, or connectivity from the target database to Amazon EFS.
 
 ![Target and EFS hostname resolution and all three TCP port checks pass](./images/preflight-section-5.png)
 
@@ -145,10 +143,10 @@ Review any `FAIL` messages before proceeding, even if other sections pass. A suc
 
 The script loads environment variables in its own process. They do not remain in your interactive shell afterward, so source the required environment files when a later command needs them.
 
-Remain in the `oracle` shell after reviewing the output. If the next operation requires `ssm-user`, use `exit` once to return to that shell.
+Remain in the `oracle` shell for Lab 2.
 
 ## Acknowledgements
 
 * **Author** - Arnab Saha, Principal Solutions Architect, OCI Multicloud
 * **Author** - Vineet Agarwal, Senior Principal Solutions Architect, OCI Multicloud
-* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 7, 2026
+* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 8, 2026

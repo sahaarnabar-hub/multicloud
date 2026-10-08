@@ -4,17 +4,17 @@
 
 Review the ZDM response file and GoldenGate preparation in your environment, then run the ZDM evaluation process. ZDM coordinates the initial Data Pump transfer and GoldenGate replication. Evaluation checks readiness but does not perform the full export/import or prove end-to-end replication.
 
-The ZDM response file contains your migration settings: the source and target connections, the table to migrate, the shared storage, and the GoldenGate configuration. ZDM reads this file during evaluation and migration so it uses the correct resources and migration method.
+The ZDM response file contains your migration settings: the source database and target database connections, the table to migrate, Amazon EFS storage, and the GoldenGate configuration. ZDM reads this file during evaluation and migration so it uses the correct resources and migration method.
 
 Estimated Time: 20 minutes
 
 ### Objectives
 
-Review the ZDM and GoldenGate configuration, confirm target readiness, and complete the ZDM evaluation process.
+Review the ZDM and GoldenGate configuration, confirm target database readiness, and complete the ZDM evaluation process.
 
 ## Task 1: Review the ZDM and GoldenGate Configuration
 
-1. Run as `oracle` at the EC2 shell and load your environment.
+1. Continue in the `oracle` shell and load your environment variables. If you reconnected through Session Manager as `ssm-user`, run `sudo -iu oracle` first.
 
     ```bash
     <copy>
@@ -26,7 +26,7 @@ Review the ZDM and GoldenGate configuration, confirm target readiness, and compl
     </copy>
     ```
 
-2. Display the ZDM migration method, included object, GoldenGate deployment names, and target service.
+2. Display the ZDM migration method, included object, GoldenGate deployment names, and target database service.
 
     ```bash
     <copy>
@@ -34,20 +34,20 @@ Review the ZDM and GoldenGate configuration, confirm target readiness, and compl
     </copy>
     ```
 
-3. Confirm the following required settings:
+3. Check your output and confirm the following required settings in the response file:
 
-    - `MIGRATION_METHOD=ONLINE_LOGICAL` and `DATA_TRANSFER_MEDIUM=NFS`.
+    - `MIGRATION_METHOD=ONLINE_LOGICAL` and `DATA_TRANSFER_MEDIUM=NFS`. Keep the literal value `NFS`: ZDM uses it for the protocol through which it accesses Amazon EFS.
     - Only `FINANCE.ACCOUNTS` included in TABLE mode.
-    - Source `SYSTEM` and `GGADMIN`; target `ADMIN` and `GGADMIN`; hub `oggadmin`.
+    - Source database users `SYSTEM` and `GGADMIN`; target database users `ADMIN` and `GGADMIN`; GoldenGate hub user `oggadmin`.
     - Case-sensitive `Local` for both deployment names.
-    - Source host reachable from the GoldenGate container, not container-local `127.0.0.1`.
-    - Target ZDM wallet alias on port 1522, not the fully qualified service string substituted into the alias field.
-    - Source `DATA_PUMP_DIR_NFS`, target `ZDM_EFS_DIR`, assigned EFS hostname, and retained shared storage.
+    - Source database host reachable from the GoldenGate container, not container-local `127.0.0.1`.
+    - Target database ZDM wallet alias on port 1522, not the fully qualified service string substituted into the alias field.
+    - Source database directory `DATA_PUMP_DIR_NFS`, target database directory `ZDM_EFS_DIR`, assigned Amazon EFS hostname, and retained Amazon EFS storage. Preserve these directory object names exactly as configured.
     - Approved lag, DDL, performance, and dump-retention settings unchanged.
 
     The validator compares the generated file with the approved template after assignment substitutions. Do not add tablespace remapping, change usernames, or loosen TLS settings to bypass a failure.
 
-4. Run the response-file validator from the **`oracle` shell**.
+4. Run the response-file validator in the `oracle` shell.
 
     ```bash
     <copy>
@@ -57,15 +57,15 @@ Review the ZDM and GoldenGate configuration, confirm target readiness, and compl
 
     ![Response validator checks online logical migration, NFS, GoldenGate and FINANCE.ACCOUNTS scope](./images/response-validation.png)
 
-    The screenshots show output from the command above. `ZDM_RESPONSE_VALID` is its success marker, not another command to run.
+    The screenshots show sample output from the command above. `ZDM_RESPONSE_VALID` is the success marker.
 
     ![Response validator finishes with ZDM_RESPONSE_VALID for Lab 101](./images/response-validation-complete.png)
 
-## Task 2: Confirm the ZDM and GoldenGate Target Preparation
+## Task 2: Confirm the ZDM and GoldenGate Target Database Preparation
 
-The target accounts are already prepared. The target TLS wallet is already installed for ZDM. ZDM prompts for credentials at runtime; SQL*Plus uses the password-authenticated alias from `adbs.env`.
+The target database accounts are already prepared. The target database TLS wallet is already installed for ZDM. ZDM prompts for credentials at runtime; SQL*Plus uses the password-authenticated alias from `adbs.env`.
 
-1. From the **`oracle` EC2 shell**, check connectivity to the assigned target.
+1. From the `oracle` shell, check connectivity to the assigned target database.
 
     ```bash
     <copy>
@@ -74,7 +74,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-2. Connect to the target as ADMIN.
+2. Connect to the target database as `ADMIN`.
 
     ```bash
     <copy>
@@ -93,11 +93,11 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-    Confirm the target is `READ WRITE` and `enable_goldengate_replication` is `TRUE`. The screenshot shows the replication setting.
+    Confirm the target database is `READ WRITE` and `enable_goldengate_replication` is `TRUE`. The screenshot shows the replication setting.
 
     ![Target GoldenGate replication parameter is TRUE](./images/target-replication-enabled.png)
 
-4. Check the target accounts.
+4. Check the target database users and their account status.
 
     ```sql
     <copy>
@@ -110,7 +110,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
 
     ![Target FINANCE and GGADMIN accounts are OPEN](./images/target-accounts-open.png)
 
-5. Check that the target ACCOUNTS table is absent before the first migration. If it already exists, stop; do not drop it to force a rerun.
+5. Check that the target database `FINANCE` schema does not contain an `ACCOUNTS` table before the first migration.
 
     ```sql
     <copy>
@@ -119,9 +119,9 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-    Expect `no rows selected` for a fresh target. If a row is returned, stop before evaluation and confirm the target assignment and migration history. Do not drop the table.
+    Expect `no rows selected` for a fresh target database. If a row is returned, resolve the target database assignment or migration-history issue before evaluation. Do not drop the table to force a rerun.
 
-6. Return to the EC2 shell.
+6. Exit SQL*Plus to return to the `oracle` shell.
 
     ```sql
     <copy>
@@ -131,7 +131,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
 
 ## Task 3: Run the ZDM Evaluation Process
 
-1. Back at the **`oracle` shell**, reload the source environment after the target SQL check.
+1. Back at the `oracle` shell, reload the source database environment variables after the target database SQL check.
 
     ```bash
     <copy>
@@ -143,7 +143,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
     </copy>
     ```
 
-2. Submit the ZDM evaluation from the **`oracle` shell** to check the source, target, Data Pump settings, and GoldenGate hub readiness.
+2. Submit the ZDM evaluation from the `oracle` shell to check the source database, target database, Data Pump settings, and GoldenGate hub readiness.
 
     ```bash
     <copy>
@@ -161,7 +161,7 @@ The target accounts are already prepared. The target TLS wallet is already insta
 
     ![Evaluation command ends with the eval option](./images/evaluation-command.png)
 
-3. Enter the prompted passwords for source SYSTEM, source GGADMIN, target ADMIN, target GGADMIN, and GoldenGate hub oggadmin from the corresponding fields in your reservation information. Do not put them on command lines, in screenshots, or in the response file. Password input is not displayed.
+3. Enter the prompted passwords for the source database (`SYSTEM`, `GGADMIN`), target database (`ADMIN`, `GGADMIN`), and GoldenGate hub (`oggadmin`) from the corresponding fields in your reservation information. Password input is not displayed.
 
     ![Evaluation submitted with runtime password prompts and returned job ID](./images/evaluation-submitted.png)
 
@@ -191,4 +191,4 @@ The target accounts are already prepared. The target TLS wallet is already insta
 
 * **Author** - Arnab Saha, Principal Solutions Architect, OCI Multicloud
 * **Author** - Vineet Agarwal, Senior Principal Solutions Architect, OCI Multicloud
-* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 7, 2026
+* **Last Updated By/Date** - Arnab Saha and Vineet Agarwal / October 8, 2026
