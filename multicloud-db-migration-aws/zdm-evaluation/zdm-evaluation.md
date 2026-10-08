@@ -40,8 +40,8 @@ Review the ZDM and GoldenGate configuration, confirm target database readiness, 
     - Only `FINANCE.ACCOUNTS` included in TABLE mode.
     - Source database users `SYSTEM` and `GGADMIN`; target database users `ADMIN` and `GGADMIN`; GoldenGate hub user `oggadmin`.
     - Case-sensitive `Local` for both deployment names.
-    - Source database host reachable from the GoldenGate container, not container-local `127.0.0.1`.
-    - Target database ZDM wallet alias on port 1522, not the fully qualified service string substituted into the alias field.
+    - Source database host reachable from the GoldenGate container.
+    - Target database ZDM wallet alias on port 1522.
     - Source database directory `DATA_PUMP_DIR_NFS`, target database directory `ZDM_EFS_DIR`, assigned Amazon EFS hostname, and retained Amazon EFS storage. Preserve these directory object names exactly as configured.
     - Approved lag, DDL, performance, and dump-retention settings unchanged.
 
