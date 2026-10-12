@@ -30,23 +30,15 @@ Allow approximately **5–10 minutes** for the initial migration to reach the re
 
     ```bash
     <copy>
-    "$ZDMCLI" migrate database \
-      -sourcesid "$ORACLE_SID" \
-      -sourcenode "$(hostname -f)" \
-      -srcauth zdmauth \
-      -srcarg1 user:ec2-user \
-      -srcarg2 "identity_file:$ZDM_SOURCE_SSH_KEY" \
-      -srcarg3 sudo_location:/usr/bin/sudo \
-      -rsp "$ZDM_RESPONSE_FILE" \
-      -pauseafter ZDM_MONITOR_GG_LAG
+    bash "$HOME/zdm-submit-once.sh" --migrate
     </copy>
     ```
 
-    ![Migration command requests pause after ZDM_MONITOR_GG_LAG](./images/migration-command.png)
+    The helper runs `zdmcli migrate database` using your assigned environment and response file, with `-pauseafter ZDM_MONITOR_GG_LAG`.
 
-3. Enter the prompted passwords for the source database (`SYSTEM`, `GGADMIN`), target database (`ADMIN`, `GGADMIN`), and GoldenGate hub (`oggadmin`) from your reservation information. Password input is not displayed. Record the migration job ID printed by ZDM; use this ID throughout the remaining steps.
+3. At `Shared ZDM password (input hidden):`, enter the shared ZDM password from your reservation information once. Input is hidden. The helper automatically answers all five password prompts for source database `SYSTEM` and `GGADMIN`, target database `ADMIN` and `GGADMIN`, and GoldenGate hub `oggadmin`. These accounts must use the same password. Record the migration job ID printed by ZDM; use this ID throughout the remaining steps.
 
-    ![Migration password prompts followed by scheduled job ID 2](./images/migration-submitted.png)
+    The underlying ZDM prompts may appear in the output, but no additional password entry is required. Submit the migration only once; use the returned job ID for subsequent queries and resumption.
 
 4. Save the migration job ID for monitoring and cutover. Replace `<JOB_ID>` (including the brackets) with the ID printed when you submitted the migration, not the evaluation job ID. Run this assignment first.
 
@@ -61,8 +53,9 @@ Allow approximately **5–10 minutes** for the initial migration to reach the re
     ```bash
     <copy>
     while true; do
-      date
+      printf '\nChecking migration job %s at %s\n' "$MIG_JOB_ID" "$(date)"
       "$ZDMCLI" query job -jobid "$MIG_JOB_ID" || break
+      printf '\nRefresh in 60 seconds. When PAUSED after ZDM_MONITOR_GG_LAG, press Ctrl+C and continue to the replication test.\n'
       sleep 60
     done
     </copy>
@@ -95,6 +88,8 @@ ZDM first coordinates the initial Data Pump load, then monitors GoldenGate repli
     Example phase output showing completed Data Pump export/import, GoldenGate Replicat startup, and lag monitoring. Confirm `PAUSED` separately in your job's status before the replication test.
 
     ![Full supplied phase output with heartbeat lag, completed replication phases, pending cutover phases, and pause phase](./images/migration-pause-before-cutover.png)
+
+    When `ZDM_MONITOR_GG_LAG` shows `COMPLETED` and the job is paused after that phase, press **Ctrl+C** to stop the monitoring loop and continue to Task 3.
 
 ## Task 3: Verify GoldenGate INSERT, UPDATE, and DELETE Replication
 
@@ -249,7 +244,11 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-    Compare this target database output with the source database output you recorded in **Task 3, Step 9**. The two rows and their values must match, and the deleted row must be absent. Repeat this SELECT if needed while GoldenGate applies the changes. Do not write to the target database or rerun the source database inserts. Resolve any mismatch before cutover.
+    Your target database output should look like the example below.
+
+    ![Example source database results: account 99000101 has balance 7777.77 and status ZDMUPD, account 99000103 remains ACTIVE, and deleted account 99000102 is absent](./images/source-dml-results.png)
+
+    Confirm that account `99000101` shows balance `7777.77` and status `ZDMUPD`, account `99000103` shows balance `1003.03` and status `ACTIVE`, and deleted account `99000102` is absent. Compare these results with your source database output from **Task 3, Step 9**. If replication is still catching up, repeat the SELECT until the results match before proceeding to cutover. Do not rerun the source database inserts or write to the target database.
 
 14. Exit SQL*Plus to return to the `oracle` shell.
 

@@ -8,6 +8,8 @@ The ZDM response file contains your migration settings: the source database and 
 
 Estimated Time: 20 minutes
 
+For background, see the [ZDM overview](https://www.oracle.com/database/zero-downtime-migration/) and [ZDM CLI command reference](https://docs.oracle.com/en/database/oracle/zero-downtime-migration/26.1/zdmug/zero-downtime-migration-zdmcli-command-reference.html).
+
 ### Objectives
 
 Review the ZDM and GoldenGate configuration, confirm target database readiness, and complete the ZDM evaluation process.
@@ -118,6 +120,7 @@ The target database accounts are already prepared. The target database TLS walle
     <copy>
     SELECT owner, table_name FROM dba_tables
     WHERE owner='FINANCE' AND table_name='ACCOUNTS';
+    PROMPT If no rows are selected, continue to the evaluation steps. Otherwise, review the target-table note below.
     </copy>
     ```
 
@@ -159,31 +162,36 @@ Allow approximately **5–10 minutes** for evaluation. This is a planning estima
 
     ```bash
     <copy>
-    "$ZDMCLI" migrate database \
-      -sourcesid "$ORACLE_SID" \
-      -sourcenode "$(hostname -f)" \
-      -srcauth zdmauth \
-      -srcarg1 user:ec2-user \
-      -srcarg2 "identity_file:$ZDM_SOURCE_SSH_KEY" \
-      -srcarg3 sudo_location:/usr/bin/sudo \
-      -rsp "$ZDM_RESPONSE_FILE" \
-      -eval
+    bash "$HOME/zdm-submit-once.sh" --eval
     </copy>
     ```
 
-    ![Evaluation command ends with the eval option](./images/evaluation-command.png)
+    The helper runs `zdmcli migrate database` with `-eval` using your assigned environment and response file. It evaluates readiness without starting the migration.
 
-3. Enter the prompted passwords for the source database (`SYSTEM`, `GGADMIN`), target database (`ADMIN`, `GGADMIN`), and GoldenGate hub (`oggadmin`) from the corresponding fields in your reservation information. Password input is not displayed.
-
-    ![Evaluation submitted with runtime password prompts and returned job ID](./images/evaluation-submitted.png)
+3. At `Shared ZDM password (input hidden):`, enter the shared ZDM password from your reservation information once. Input is hidden. The helper supplies it to the five ZDM prompts: source database `SYSTEM` and `GGADMIN`, target database `ADMIN` and `GGADMIN`, and GoldenGate hub `oggadmin`. These five accounts must use the same password. The helper does not store the password in its script or pass it as a command-line argument.
 
     ZDM prints the job ID when it schedules your evaluation. Record this ID: it identifies your evaluation and is important for monitoring its progress and locating its results. Your ID may differ from the screenshot.
 
-4. Replace `<JOB_ID>` (including the brackets) with the evaluation job ID printed in the previous step. Run the command again to see updated progress. Keep this evaluation ID separate from the migration job ID that you will receive in Lab 4.
+4. Replace `<JOB_ID>` (including the brackets) with the evaluation job ID printed in the previous step. Keep this evaluation ID separate from the migration job ID that you will receive in Lab 4.
 
     ```bash
     <copy>
-    "$ZDMCLI" query job -jobid <JOB_ID>
+    export EVAL_JOB_ID="<JOB_ID>"
+    </copy>
+    ```
+
+    If you reconnect, switch to `oracle`, reload the environment from Step 1, and set `EVAL_JOB_ID` again to the existing evaluation job ID. Do not submit another evaluation just to monitor it.
+
+    Run this separate block to check the evaluation every **30 seconds**. When the output reports `SUCCEEDED`, press **Ctrl+C** and continue to Step 5. If it reports `FAILED`, stop the loop and review the reported error. Ctrl+C stops monitoring, not the ZDM job.
+
+    ```bash
+    <copy>
+    while true; do
+      printf '\nChecking evaluation job %s at %s\n' "$EVAL_JOB_ID" "$(date)"
+      "$ZDMCLI" query job -jobid "$EVAL_JOB_ID" || break
+      printf '\nRefresh in 30 seconds. On SUCCEEDED, press Ctrl+C and review the evaluation results.\n'
+      sleep 30
+    done
     </copy>
     ```
 

@@ -41,7 +41,7 @@ In this lab, you will:
 
 ## Task 2: Sign In to the AWS Management Console
 
-1. Copy the **AWS Login** URL from your reservation information and open it in a new browser tab. The provided URL includes the workshop Region:
+1. Copy the **AWS Login** URL from your reservation information and open it in an incognito or private browser window to avoid using another AWS account's existing session. The provided URL includes the workshop Region:
 
     [Open the workshop AWS account in US West (Oregon)](https://209197637745.signin.aws.amazon.com/console?region=us-west-2)
 
