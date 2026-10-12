@@ -12,6 +12,8 @@ Run Data Pump and GoldenGate through ZDM, verify committed changes, and retain c
 
 ## Task 1: Start the ZDM Migration with a GoldenGate Replication Pause
 
+Allow approximately **5–10 minutes** for the initial migration to reach the replication pause, with additional time for the data-change test and cutover. This is a planning estimate; use the job status to decide when to proceed.
+
 1. Continue in the `oracle` shell after successful ZDM evaluation and Amazon EFS validation. Load your environment variables. If you reconnected through Session Manager as `ssm-user`, run `sudo -iu oracle` first.
 
     ```bash
@@ -46,13 +48,27 @@ Run Data Pump and GoldenGate through ZDM, verify committed changes, and retain c
 
     ![Migration password prompts followed by scheduled job ID 2](./images/migration-submitted.png)
 
-4. Replace `<JOB_ID>` (including the brackets) with the migration job ID printed in the previous step, then run the command. Use that same ID wherever `<JOB_ID>` appears below, including filenames. Do not use the evaluation job ID. The screenshot's ID is only an example.
+4. Save the migration job ID for monitoring and cutover. Replace `<JOB_ID>` (including the brackets) with the ID printed when you submitted the migration, not the evaluation job ID. Run this assignment first.
 
     ```bash
     <copy>
-    "$ZDMCLI" query job -jobid <JOB_ID>
+    export MIG_JOB_ID="<JOB_ID>"
     </copy>
     ```
+
+    Then run the following block unchanged. It uses the saved job ID and prints the job output every **one minute**.
+
+    ```bash
+    <copy>
+    while true; do
+      date
+      "$ZDMCLI" query job -jobid "$MIG_JOB_ID" || break
+      sleep 60
+    done
+    </copy>
+    ```
+
+    When the output reports `PAUSED` after `ZDM_MONITOR_GG_LAG`, press **Ctrl+C** to stop this monitoring loop and continue with the replication test. Ctrl+C stops the loop, not the ZDM job. If the job reports a failure, stop monitoring and resolve the error before proceeding. Do not submit another migration.
 
 ## Task 2: Monitor the ZDM Initial Load and GoldenGate Replication
 
@@ -78,7 +94,7 @@ ZDM first coordinates the initial Data Pump load, then monitors GoldenGate repli
 
     Example phase output showing completed Data Pump export/import, GoldenGate Replicat startup, and lag monitoring. Confirm `PAUSED` separately in your job's status before the replication test.
 
-    ![Completed initial-load and GoldenGate replication phases with heartbeat lag](./images/migration-load-replication-phases.png)
+    ![Full supplied phase output with heartbeat lag, completed replication phases, pending cutover phases, and pause phase](./images/migration-pause-before-cutover.png)
 
 ## Task 3: Verify GoldenGate INSERT, UPDATE, and DELETE Replication
 
@@ -233,9 +249,7 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-    Repeat this SELECT until it matches the committed source database results. Replication is asynchronous. Do not write to the target database or rerun the source database inserts. Resolve any mismatch before cutover.
-
-    ![Target query matches the committed source INSERT UPDATE and DELETE results](./images/target-dml-results.png)
+    Compare this target database output with the source database output you recorded in **Task 3, Step 9**. The two rows and their values must match, and the deleted row must be absent. Repeat this SELECT if needed while GoldenGate applies the changes. Do not write to the target database or rerun the source database inserts. Resolve any mismatch before cutover.
 
 14. Exit SQL*Plus to return to the `oracle` shell.
 
@@ -266,7 +280,11 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
     </copy>
     ```
 
-4. After the replication test passes, resume the job once.
+    Before cutover, expect `ZDM_MONITOR_GG_LAG` to be `COMPLETED` and the switchover phases to remain `PENDING`. The pause phase is shown at the bottom of this example.
+
+    ![ZDM output at the pause after monitoring GoldenGate lag, before cutover](./images/migration-pause-before-cutover.png)
+
+4. After the replication test passes, resume the job once. Replace `<JOB_ID>` with the same migration job ID you just queried.
 
     ```bash
     <copy>
@@ -290,7 +308,9 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
 
     When migration finishes, the query reports `Current status: SUCCEEDED`. Your job ID and execution times will differ from this example.
 
-    ![ZDM migration job reports SUCCEEDED with its execution start and end times](./images/migration-succeeded.png)
+    ![Final ZDM query for example job 5 reports SUCCEEDED and execution times](./images/migration-final-status.png)
+
+    See Task 5 for the complete query output after migration completion.
 
 ## Task 5: Validate the Migration and Save the ZDM Results
 
@@ -332,6 +352,10 @@ Run only while the migration is paused after lag monitoring, before cutover. Use
       | tee "$HOME/zdm-job-<JOB_ID>-final.txt"
     </copy>
     ```
+
+    Expected completed migration output: `Current status: SUCCEEDED`, followed by all migration phases marked `COMPLETED`. Your job ID, timestamps, and duration will differ.
+
+    ![Full ZDM CLI query output showing SUCCEEDED and all migration phases COMPLETED](./images/migration-query-complete.png)
 
 5. Record Lab ID, evaluation/migration job IDs, start/end times, phase statuses, sanitized response file, CPAT/excluded-object reports, Data Pump logs, replication metrics, and source/target validation results. Obtain paths from your job rather than copying prototype paths.
 

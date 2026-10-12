@@ -4,7 +4,7 @@
 
 The source Oracle database and Zero Downtime Migration (ZDM) run on your assigned EC2 instance. Oracle GoldenGate runs in a Podman container on that instance. Data Pump copies the initial data through shared Amazon EFS storage, and GoldenGate captures ongoing changes to keep the target Autonomous Database synchronized.
 
-Run the preflight script once, then review its eight output sections. Each section checks a different part of the migration environment.
+Run the preflight script once and confirm the final success summary. The detailed output sections are optional reference material for understanding the checks or investigating a failure.
 
 Estimated Time: 15 minutes
 
@@ -12,11 +12,15 @@ Estimated Time: 15 minutes
 
 Connect to your assigned EC2 instance, run the automated checks as `oracle`, and understand the results before starting migration.
 
-## Task 1: Connect Through Session Manager
+## Task 1: Connect to SSM Session Manager
 
 1. Confirm that the AWS Console Region is **US West (Oregon), us-west-2**.
 
-2. Open **EC2 → Instances**, select your assigned instance, and choose **Connect → Session Manager → Connect**.
+2. Open **EC2 → Instances**. Copy the **EC2 Instance ID** from your reservation information into the search field. Select the checkbox beside the matching instance, then choose **Connect**. Use your assigned instance ID; Lab 101 below is an example.
+
+    ![Filter by the assigned EC2 instance ID, select its checkbox, and choose Connect](./images/ec2-select-assigned-instance.png)
+
+    On the connection page, choose **SSM Session Manager** and then **Connect**. In the newer console layout, this option appears under **In web browser → Maximum security — IAM authentication — SSM Session Manager**. Do not select EC2 Instance Connect.
 
 3. The session opens a Linux shell as `ssm-user`. Switch to the `oracle` operating-system user:
 
@@ -51,7 +55,11 @@ Connect to your assigned EC2 instance, run the automated checks as `oracle`, and
 
 2. Check the summary. Expect `Failed checks : 0` and `LAB1_PREFLIGHT: PASS`. Resolve any failed checks before proceeding.
 
-3. Open the saved output to review:
+    ![Final preflight summary with zero failed checks and LAB1_PREFLIGHT PASS](./images/preflight-section-8.png)
+
+    If both values match, continue to Lab 2. The detailed review below is optional.
+
+3. **Optional:** Open the saved output to review a check or investigate a failure:
 
     ```bash
     <copy>
@@ -61,7 +69,7 @@ Connect to your assigned EC2 instance, run the automated checks as `oracle`, and
 
     Use the arrow keys or Page Up/Page Down to move through the output. Use the left and right arrows for wide lines. Press `q` to return to the shell.
 
-## Task 3: Validate Each Output Section
+## (Optional Task) Review Detailed Validation Output
 
 The sections below show screenshots of sample output. Compare them with your own results. Resource names, addresses, paths, timestamps, container IDs, and row counts can differ. Check your assigned values rather than copying values from the screenshots.
 

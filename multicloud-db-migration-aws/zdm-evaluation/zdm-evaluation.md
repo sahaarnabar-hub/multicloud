@@ -14,7 +14,7 @@ Review the ZDM and GoldenGate configuration, confirm target database readiness, 
 
 ## Task 1: Review the ZDM and GoldenGate Configuration
 
-1. Continue in the `oracle` shell and load your environment variables. If you reconnected through Session Manager as `ssm-user`, run `sudo -iu oracle` first.
+1. Continue in the `oracle` shell and load the source database, ZDM, and assigned environment variables. If you reconnected through SSM Session Manager as `ssm-user`, run `sudo -iu oracle` first.
 
     ```bash
     <copy>
@@ -34,7 +34,9 @@ Review the ZDM and GoldenGate configuration, confirm target database readiness, 
     </copy>
     ```
 
-3. Check your output and confirm the following required settings in the response file:
+    Expect `ONLINE_LOGICAL`, `NFS`, `FINANCE.ACCOUNTS`, and the case-sensitive deployment name `Local`. The target database alias is specific to your assigned environment.
+
+3. Review the response-file settings below. The validator in Step 4 checks the full configuration, including settings not printed by Step 2:
 
     - `MIGRATION_METHOD=ONLINE_LOGICAL` and `DATA_TRANSFER_MEDIUM=NFS`. Keep the literal value `NFS`: ZDM uses it for the protocol through which it accesses Amazon EFS.
     - Only `FINANCE.ACCOUNTS` included in TABLE mode.
@@ -74,7 +76,7 @@ The target database accounts are already prepared. The target database TLS walle
     </copy>
     ```
 
-2. Connect to the target database as `ADMIN`.
+2. Connect to the target database as `ADMIN`. When `Enter password:` appears, enter **Target ADMIN Password** from your reservation information. Password input is not displayed.
 
     ```bash
     <copy>
@@ -82,7 +84,7 @@ The target database accounts are already prepared. The target database TLS walle
     </copy>
     ```
 
-3. Enter **Target ADMIN Password** from your reservation information when prompted. Check the target database state and GoldenGate replication setting.
+3. After connecting, check the target database state and GoldenGate replication setting.
 
     ```sql
     <copy>
@@ -119,7 +121,15 @@ The target database accounts are already prepared. The target database TLS walle
     </copy>
     ```
 
-    Expect `no rows selected` for a fresh target database. If a row is returned, resolve the target database assignment or migration-history issue before evaluation. Do not drop the table to force a rerun.
+    Expect `no rows selected` for a fresh target database.
+
+    **Note:** If a row is returned, drop the existing table on your assigned **target database** as `ADMIN` before evaluation. This removes the table and its data; do not run it on the source database.
+
+    ```sql
+    <copy>
+    DROP TABLE finance.accounts;
+    </copy>
+    ```
 
 6. Exit SQL*Plus to return to the `oracle` shell.
 
@@ -130,6 +140,8 @@ The target database accounts are already prepared. The target database TLS walle
     ```
 
 ## Task 3: Run the ZDM Evaluation Process
+
+Allow approximately **5–10 minutes** for evaluation. This is a planning estimate, not a timeout; completion can take longer. Continue based on the job status, not elapsed time.
 
 1. Back at the `oracle` shell, reload the source database environment variables after the target database SQL check.
 
@@ -167,7 +179,7 @@ The target database accounts are already prepared. The target database TLS walle
 
     ZDM prints the job ID when it schedules your evaluation. Record this ID: it identifies your evaluation and is important for monitoring its progress and locating its results. Your ID may differ from the screenshot.
 
-4. Replace `<JOB_ID>` (including the brackets) with the job ID printed in the previous step, then run the command to check the evaluation status. Run it again to see updated progress.
+4. Replace `<JOB_ID>` (including the brackets) with the evaluation job ID printed in the previous step. Run the command again to see updated progress. Keep this evaluation ID separate from the migration job ID that you will receive in Lab 4.
 
     ```bash
     <copy>
